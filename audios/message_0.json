@@ -1,0 +1,13 @@
+{
+  "metadata": {
+    "soundFile": "D:\\AI-NEXUS_Ori3\\backend\\node_backend\\audios\\message_0.wav",
+    "duration": 1.01
+  },
+  "mouthCues": [
+    { "start": 0.00, "end": 0.06, "value": "X" },
+    { "start": 0.06, "end": 0.24, "value": "B" },
+    { "start": 0.24, "end": 0.36, "value": "A" },
+    { "start": 0.36, "end": 0.78, "value": "B" },
+    { "start": 0.78, "end": 1.01, "value": "X" }
+  ]
+}
