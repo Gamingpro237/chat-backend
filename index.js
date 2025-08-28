@@ -618,6 +618,10 @@ setInterval(() => {
   audioManager.cleanupOldFiles();
 }, 60 * 60 * 1000);
 
+// Root route (homepage)
+app.get("/", (req, res) => {
+  res.send("🚀 Backend is running! Try POST /chat or GET /health");
+});
 // Start server
 app.listen(port, () => {
   console.log(`AI Companion listening on port ${port}`);
