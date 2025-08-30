@@ -649,14 +649,31 @@ app.get("/health", (req, res) => {
     service: "chatovia-backend"
   });
 });
+
+// Add this to verify system FFmpeg is available
+const { execSync } = require('child_process');
+
+const checkSystemFFmpeg = () => {
+  try {
+    const ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf8' });
+    console.log('System FFmpeg found:', ffmpegVersion.split('\n')[0]);
+    return true;
+  } catch (error) {
+    console.log('System FFmpeg not available, using fallback');
+    return false;
+  }
+};
+
 // Start server
 app.listen(port, () => {
   console.log(`AI Companion listening on port ${port}`);
+  checkSystemFFmpeg();
   console.log('Environment check:', {
     hasOpenAI: !!process.env.OPENAI_API_KEY,
     hasElevenLabs: !!process.env.ELEVEN_LABS_API_KEY,
     hasSupabase: !!process.env.SUPABASE_URL,
     hasFFmpeg: !!process.env.FFMPEG_PATH,
-    hasRhubarb: !!process.env.RHUBARB_PATH
+    hasRhubarb: !!process.env.RHUBARB_PATH,
+    platform: process.platform
   });
 });
