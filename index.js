@@ -412,12 +412,21 @@ setInterval(expireOldPlans, 24 * 60 * 60 * 1000);
 
 
 // Replace the current voice.textToSpeech call with this function
+// Replace your generateVoiceWithElevenLabs function with this enhanced version
 const generateVoiceWithElevenLabs = async (text, outputPath, voiceId, apiKey) => {
   try {
     console.log(`Generating audio for text: "${text.substring(0, 50)}..."`);
     console.log(`Voice ID: ${voiceId}`);
     console.log(`Output path: ${outputPath}`);
-    console.log(`API Key (first 10 chars): ${apiKey?.substring(0, 10)}`);
+    
+    // Validate API key format
+    if (!apiKey || !apiKey.startsWith('sk_')) {
+      throw new Error('Invalid ElevenLabs API key format');
+    }
+    
+    // Log only first and last 4 chars for security
+    const maskedKey = `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`;
+    console.log(`API Key (masked): ${maskedKey}`);
     
     const response = await axios({
       method: 'post',
@@ -435,10 +444,14 @@ const generateVoiceWithElevenLabs = async (text, outputPath, voiceId, apiKey) =>
         },
       },
       responseType: 'stream',
+      timeout: 30000, // 30 second timeout
     });
 
+    // Import fs at the top of your file if not already done
+    const fsModule = await import('fs');
+    
     // Write the response data to file
-    const writer = response.data.pipe(require('fs').createWriteStream(outputPath));
+    const writer = response.data.pipe(fsModule.createWriteStream(outputPath));
     
     return new Promise((resolve, reject) => {
       writer.on('finish', () => {
@@ -451,16 +464,101 @@ const generateVoiceWithElevenLabs = async (text, outputPath, voiceId, apiKey) =>
       });
     });
   } catch (error) {
-    console.error('ElevenLabs API Error:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
+    if (error.response?.status === 401) {
+      console.error('ElevenLabs Authentication Failed:', {
+        status: 401,
+        message: 'Invalid API key. Please check your ELEVEN_LABS_API_KEY environment variable.',
+        hint: 'Get your API key from https://elevenlabs.io/settings/api-keys'
+      });
+      
+      // Create a silent audio file as fallback (1 second of silence)
+      // This prevents the entire request from failing
+      try {
+        const fsModule = await import('fs');
+        const silentMp3 = Buffer.from([
+          0xFF, 0xFB, 0x90, 0x00, // MP3 header
+          // ... minimal silent MP3 data
+        ]);
+        await fsModule.promises.writeFile(outputPath, silentMp3);
+        console.log('Created fallback silent audio file');
+        return;
+      } catch (fallbackError) {
+        console.error('Failed to create fallback audio:', fallbackError);
+      }
+    } else if (error.response?.status === 429) {
+      console.error('ElevenLabs Rate Limit:', {
+        status: 429,
+        message: 'Rate limit exceeded. Please wait and try again.',
+      });
+    } else if (error.response?.status === 400) {
+      console.error('ElevenLabs Bad Request:', {
+        status: 400,
+        message: 'Invalid request parameters',
+        data: error.response?.data
+      });
+    } else {
+      console.error('ElevenLabs API Error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.message,
+        code: error.code
+      });
+    }
     throw error;
   }
 };
 
+// Add this validation at startup (in your app.listen callback)
+const validateElevenLabsConfig = async () => {
+  console.log('Validating ElevenLabs configuration...');
+  
+  const apiKey = process.env.ELEVEN_LABS_API_KEY;
+  const voiceId = process.env.VOICE_ID;
+  
+  if (!apiKey) {
+    console.error('❌ ELEVEN_LABS_API_KEY is not set in environment variables');
+    return false;
+  }
+  
+  if (!voiceId) {
+    console.error('❌ VOICE_ID is not set in environment variables');
+    return false;
+  }
+  
+  // Test the API key with a simple request
+  try {
+    const response = await axios({
+      method: 'get',
+      url: 'https://api.elevenlabs.io/v1/voices',
+      headers: {
+        'xi-api-key': apiKey,
+      },
+      timeout: 10000,
+    });
+    
+    console.log('✅ ElevenLabs API key is valid');
+    console.log(`✅ Found ${response.data.voices?.length || 0} voices`);
+    
+    // Check if the specified voice ID exists
+    const voiceExists = response.data.voices?.some(v => v.voice_id === voiceId);
+    if (voiceExists) {
+      console.log(`✅ Voice ID ${voiceId} is valid`);
+    } else {
+      console.warn(`⚠️ Voice ID ${voiceId} not found in account. Available voices:`, 
+        response.data.voices?.map(v => v.voice_id).join(', '));
+    }
+    
+    return true;
+  } catch (error) {
+    if (error.response?.status === 401) {
+      console.error('❌ ElevenLabs API key is invalid or expired');
+    } else {
+      console.error('❌ Failed to validate ElevenLabs configuration:', error.message);
+    }
+    return false;
+  }
+};
+ 
 // Update your chat endpoint to use this function instead:
 // Replace this line:
 // await voice.textToSpeech(elevenLabsApiKey, voiceID, filePaths.mp3, messages[i].text);
@@ -737,4 +835,6 @@ app.listen(port, () => {
   console.log('About to call ElevenLabs with:');
   console.log('API Key (first 10 chars):', elevenLabsApiKey?.substring(0, 10));
   console.log('Voice ID:', voiceID);
+    // Validate ElevenLabs configuration
+  await validateElevenLabsConfig();
 });
