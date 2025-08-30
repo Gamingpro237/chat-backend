@@ -1,5 +1,6 @@
 import { exec } from "child_process";
 import { execSync } from "child_process";
+import axios from 'axios';
 import cors from "cors";
 import dotenv from "dotenv";
 import voice from "elevenlabs-node";
@@ -409,6 +410,63 @@ const expireOldPlans = async () => {
 // Run cleanup daily at midnight
 setInterval(expireOldPlans, 24 * 60 * 60 * 1000);
 
+
+// Replace the current voice.textToSpeech call with this function
+const generateVoiceWithElevenLabs = async (text, outputPath, voiceId, apiKey) => {
+  try {
+    console.log(`Generating audio for text: "${text.substring(0, 50)}..."`);
+    console.log(`Voice ID: ${voiceId}`);
+    console.log(`Output path: ${outputPath}`);
+    console.log(`API Key (first 10 chars): ${apiKey?.substring(0, 10)}`);
+    
+    const response = await axios({
+      method: 'post',
+      url: `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': apiKey,
+      },
+      data: {
+        text: text,
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.5,
+        },
+      },
+      responseType: 'stream',
+    });
+
+    // Write the response data to file
+    const writer = response.data.pipe(require('fs').createWriteStream(outputPath));
+    
+    return new Promise((resolve, reject) => {
+      writer.on('finish', () => {
+        console.log(`Audio file successfully created at: ${outputPath}`);
+        resolve();
+      });
+      writer.on('error', (error) => {
+        console.error('Error writing audio file:', error);
+        reject(error);
+      });
+    });
+  } catch (error) {
+    console.error('ElevenLabs API Error:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
+    throw error;
+  }
+};
+
+// Update your chat endpoint to use this function instead:
+// Replace this line:
+// await voice.textToSpeech(elevenLabsApiKey, voiceID, filePaths.mp3, messages[i].text);
+
+// With this:
+
 // Routes
 app.post("/chat", async (req, res) => {
   let sessionId = null;
@@ -518,7 +576,7 @@ app.post("/chat", async (req, res) => {
         
         // Generate audio with ElevenLabs
         console.log(`Generating audio for message ${i}...`);
-        await voice.textToSpeech(elevenLabsApiKey, voiceID, filePaths.mp3, messages[i].text);
+        await generateVoiceWithElevenLabs(messages[i].text, filePaths.mp3, voiceID, elevenLabsApiKey);
         
         // Generate lip-sync
         console.log(`Generating lip-sync for message ${i}...`);
@@ -675,4 +733,9 @@ app.listen(port, () => {
     platform: process.platform
   });
   checkSystemFFmpeg();
+  // Also add this before making the ElevenLabs request
+  console.log('About to call ElevenLabs with:');
+  console.log('API Key (first 10 chars):', elevenLabsApiKey?.substring(0, 10));
+  console.log('Voice ID:', voiceID);
+  console.log('Text length:', messages[i].text?.length);
 });
