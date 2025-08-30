@@ -558,7 +558,8 @@ const validateElevenLabsConfig = async () => {
     return false;
   }
 };
- 
+
+await validateElevenLabsConfig();
 // Update your chat endpoint to use this function instead:
 // Replace this line:
 // await voice.textToSpeech(elevenLabsApiKey, voiceID, filePaths.mp3, messages[i].text);
@@ -836,5 +837,4 @@ app.listen(port, () => {
   console.log('API Key (first 10 chars):', elevenLabsApiKey?.substring(0, 10));
   console.log('Voice ID:', voiceID);
     // Validate ElevenLabs configuration
-  await validateElevenLabsConfig();
 });
