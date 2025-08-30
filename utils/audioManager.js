@@ -10,8 +10,8 @@ export class AudioManager {
   constructor(supabase) {
     this.supabase = supabase;
     
-    // Correct path: go up two levels from utils/ to backend/ then to audios/
-    this.baseAudioDir = path.join(__dirname, '..', 'audios');
+    // FIXED: Use absolute path from project root
+    this.baseAudioDir = path.join(process.cwd(), 'audios');
     this.usersDir = path.join(this.baseAudioDir, 'users');
     this.templatesDir = path.join(this.baseAudioDir, 'templates');
     
@@ -32,45 +32,52 @@ export class AudioManager {
       
       console.log('Audio directories initialized successfully');
       
-      // Copy initial template files if they don't exist
-      await this.setupTemplateFiles();
+      // Create default template files if they don't exist
+      await this.createDefaultTemplates();
     } catch (error) {
       console.error('Error initializing directories:', error);
     }
   }
 
-  async setupTemplateFiles() {
+  async createDefaultTemplates() {
     try {
-      const templateFiles = [
-        'intro_0.json',
-        'intro_1.json',
-        'message_0.json'
-      ];
+      const defaultTemplates = {
+        'intro_0.json': JSON.stringify({
+          mouthCues: [
+            { start: 0, end: 0.5, value: 'X' },
+            { start: 0.5, end: 1.0, value: 'A' }
+          ]
+        }),
+        'intro_1.json': JSON.stringify({
+          mouthCues: [
+            { start: 0, end: 0.3, value: 'X' },
+            { start: 0.3, end: 0.8, value: 'B' },
+            { start: 0.8, end: 1.2, value: 'C' }
+          ]
+        }),
+        'message_0.json': JSON.stringify({
+          mouthCues: [
+            { start: 0, end: 0.4, value: 'X' },
+            { start: 0.4, end: 0.9, value: 'D' },
+            { start: 0.9, end: 1.5, value: 'E' }
+          ]
+        })
+      };
 
-      for (const file of templateFiles) {
-        const sourcePath = path.join(this.baseAudioDir, file);
-        const templatePath = path.join(this.templatesDir, file);
+      for (const [filename, content] of Object.entries(defaultTemplates)) {
+        const templatePath = path.join(this.templatesDir, filename);
         
         try {
-          // Check if source file exists
-          await fs.access(sourcePath);
-          
-          // Check if template doesn't exist, then copy
-          try {
-            await fs.access(templatePath);
-            console.log(`Template exists: ${file}`);
-          } catch {
-            await fs.copyFile(sourcePath, templatePath);
-            console.log(`Copied template: ${file}`);
-          }
+          await fs.access(templatePath);
+          console.log(`Template exists: ${filename}`);
         } catch {
-          // Source file doesn't exist, create empty template
-          console.log(`Source not found: ${file}, creating empty template`);
-          await fs.writeFile(templatePath, JSON.stringify({}));
+          // Create the template file with default content
+          await fs.writeFile(templatePath, content);
+          console.log(`Created default template: ${filename}`);
         }
       }
     } catch (error) {
-      console.error('Error setting up template files:', error);
+      console.error('Error creating default templates:', error);
     }
   }
 
@@ -95,8 +102,11 @@ export class AudioManager {
     try {
       const userDir = path.join(this.usersDir, userId);
       
-      // Ensure templates directory exists
-      await fs.mkdir(this.templatesDir, { recursive: true });
+      // Ensure user directory exists
+      await fs.mkdir(userDir, { recursive: true });
+      
+      // Ensure templates directory exists and has files
+      await this.createDefaultTemplates();
       
       const templateFiles = await fs.readdir(this.templatesDir);
       
@@ -111,12 +121,13 @@ export class AudioManager {
           console.warn(`Could not copy ${file}:`, error.message);
           // Create empty file as fallback
           if (file.endsWith('.json')) {
-            await fs.writeFile(destPath, JSON.stringify({}));
+            await fs.writeFile(destPath, JSON.stringify({ mouthCues: [] }));
           }
         }
       }
     } catch (error) {
       console.error('Error copying template files:', error);
+      // Don't throw error, just log it - we can continue without templates
     }
   }
 
@@ -183,64 +194,58 @@ export class AudioManager {
     }
   }
 
-async cleanupOldFiles() {
-  try {
-    const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  async cleanupOldFiles() {
+    try {
+      const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // Use Supabase client instead of fetch
-    const { data: oldSessions, error } = await this.supabase
-      .from('user_audio_sessions')
-      .select('*')
-      .lt('created_at', cutoffTime.toISOString());
+      const { data: oldSessions, error } = await this.supabase
+        .from('user_audio_sessions')
+        .select('*')
+        .lt('created_at', cutoffTime.toISOString());
 
-    if (error) {
-      console.error('Supabase query error:', error);
-      return;
-    }
-
-    for (const session of oldSessions || []) {
-      try {
-        const userDir = path.join(this.usersDir, session.user_id);
-        
-        // Check if directory exists before reading
-        try {
-          await fs.access(userDir);
-          const files = await fs.readdir(userDir);
-          
-          for (const file of files) {
-            if (file.startsWith(session.session_id)) {
-              await fs.unlink(path.join(userDir, file));
-              console.log(`Deleted file: ${file}`);
-            }
-          }
-        } catch (dirError) {
-          console.log(`Directory ${userDir} doesn't exist or inaccessible:`, dirError.message);
-          continue;
-        }
-
-        // Delete the session record
-        const { error: deleteError } = await this.supabase
-          .from('user_audio_sessions')
-          .delete()
-          .eq('session_id', session.session_id);
-
-        if (deleteError) {
-          console.error(`Error deleting session ${session.session_id}:`, deleteError);
-        } else {
-          console.log(`Deleted session record: ${session.session_id}`);
-        }
-
-      } catch (fileError) {
-        console.error(`Error cleaning session ${session.session_id}:`, fileError);
+      if (error) {
+        console.error('Supabase query error:', error);
+        return;
       }
+
+      for (const session of oldSessions || []) {
+        try {
+          const userDir = path.join(this.usersDir, session.user_id);
+          
+          try {
+            await fs.access(userDir);
+            const files = await fs.readdir(userDir);
+            
+            for (const file of files) {
+              if (file.startsWith(session.session_id)) {
+                await fs.unlink(path.join(userDir, file));
+                console.log(`Deleted file: ${file}`);
+              }
+            }
+          } catch (dirError) {
+            console.log(`Directory ${userDir} doesn't exist:`, dirError.message);
+          }
+
+          // Delete the session record
+          const { error: deleteError } = await this.supabase
+            .from('user_audio_sessions')
+            .delete()
+            .eq('session_id', session.session_id);
+
+          if (deleteError) {
+            console.error(`Error deleting session ${session.session_id}:`, deleteError);
+          }
+
+        } catch (fileError) {
+          console.error(`Error cleaning session ${session.session_id}:`, fileError);
+        }
+      }
+
+      console.log(`Cleaned up ${oldSessions?.length || 0} sessions`);
+    } catch (error) {
+      console.error('Cleanup error:', error);
     }
-
-    console.log(`Cleaned up ${oldSessions?.length || 0} sessions`);
-  } catch (error) {
-    console.error('Cleanup error:', error);
   }
-}
-
 
   async getFilePaths(userId, sessionId, messageIndex) {
     return {
@@ -249,4 +254,4 @@ async cleanupOldFiles() {
       json: this.getUserAudioPath(userId, sessionId, messageIndex, 'json')
     };
   }
-}
+        }
