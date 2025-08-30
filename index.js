@@ -1,4 +1,5 @@
 import { exec } from "child_process";
+import { execSync } = "child_process";
 import cors from "cors";
 import dotenv from "dotenv";
 import voice from "elevenlabs-node";
@@ -651,8 +652,6 @@ app.get("/health", (req, res) => {
 });
 
 // Add this to verify system FFmpeg is available
-const { execSync } = require('child_process');
-
 const checkSystemFFmpeg = () => {
   try {
     const ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf8' });
