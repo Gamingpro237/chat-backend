@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js --ext js --ignore '*.test.js'"
+    "dev": "nodemon index.js --ext js --ignore '*.test.js'",
+    "install-ffmpeg": "mkdir -p bin && curl -o bin/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz && tar -xf bin/ffmpeg.tar.xz -C bin --strip-components=1 && rm bin/ffmpeg.tar.xz && chmod +x bin/ffmpeg"
   },
   "author": "Mouafo kamgno keryan gift (founder of chatovia)",
   "dependencies": {
