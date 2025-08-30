@@ -4,7 +4,7 @@ nixPkgs = ["ffmpeg", "nodejs"]
 [phases.install]
 cmds = [
   "npm install",
-  "chmod +x ./bin/rhubarb/rhubarb"
+  "chmod +x ./bin2/rhubarb/rhubarb"
 ]
 
 [start]
