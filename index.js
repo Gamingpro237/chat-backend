@@ -1,5 +1,5 @@
 import { exec } from "child_process";
-import { execSync } = "child_process";
+import { execSync } from "child_process";
 import cors from "cors";
 import dotenv from "dotenv";
 import voice from "elevenlabs-node";
