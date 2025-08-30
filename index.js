@@ -608,16 +608,47 @@ app.post("/verify-payment", async (req, res) => {
   }
 });
 
-// Health check endpoint
-app.get("/health", (req, res) => {
-  res.json({ status: "OK", timestamp: new Date().toISOString() });
-});
+// In your backend index.js, update CORS configuration
+const corsOptions = {
+  origin: [
+    'https://chatovia-v3-production.up.railway.app',
+    'http://localhost:3000' // for local development
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
 
+app.use(cors(corsOptions));
 // Cleanup old files every hour
 setInterval(() => {
   audioManager.cleanupOldFiles();
 }, 60 * 60 * 1000);
 
+// Add this to your backend index.js
+app.get("/", (req, res) => {
+  res.json({ 
+    message: "Chatovia Backend API is running",
+    status: "OK",
+    version: "1.0.0",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+    endpoints: {
+      chat: "POST /chat",
+      verifyPayment: "POST /verify-payment",
+      health: "GET /health"
+    },
+    documentation: "See frontend for API usage"
+  });
+});
+
+// Health check endpoint (keep this)
+app.get("/health", (req, res) => {
+  res.json({ 
+    status: "OK", 
+    timestamp: new Date().toISOString(),
+    service: "chatovia-backend"
+  });
+});
 // Start server
 app.listen(port, () => {
   console.log(`AI Companion listening on port ${port}`);
