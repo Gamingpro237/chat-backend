@@ -666,7 +666,6 @@ const checkSystemFFmpeg = () => {
 // Start server
 app.listen(port, () => {
   console.log(`AI Companion listening on port ${port}`);
-  checkSystemFFmpeg();
   console.log('Environment check:', {
     hasOpenAI: !!process.env.OPENAI_API_KEY,
     hasElevenLabs: !!process.env.ELEVEN_LABS_API_KEY,
@@ -675,4 +674,5 @@ app.listen(port, () => {
     hasRhubarb: !!process.env.RHUBARB_PATH,
     platform: process.platform
   });
+  checkSystemFFmpeg();
 });
