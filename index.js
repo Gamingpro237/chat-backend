@@ -737,5 +737,4 @@ app.listen(port, () => {
   console.log('About to call ElevenLabs with:');
   console.log('API Key (first 10 chars):', elevenLabsApiKey?.substring(0, 10));
   console.log('Voice ID:', voiceID);
-  console.log('Text length:', messages[i].text?.length);
 });
