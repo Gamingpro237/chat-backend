@@ -18,6 +18,9 @@
     "openai": "^4.26.0",
     "uuid": "^11.1.0"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
     "nodemon": "^3.1.10"
   },
